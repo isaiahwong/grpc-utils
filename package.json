@@ -1,0 +1,39 @@
+{
+  "name": "grpc-utils",
+  "version": "0.0.3",
+  "description": "Useful helpers for grpc ops",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "rm -rf build && babel src -d build",
+    "test": "babel-node ./test/index.js"
+  },
+  "dependencies": {
+    "esther": "^1.0.5",
+    "grpc": "^1.21.1",
+    "horeb": "^1.0.0",
+    "lodash": "^4.17.11",
+    "protobufjs": "^6.8.8"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.2.0",
+    "@babel/core": "^7.2.0",
+    "@babel/node": "^7.4.5",
+    "@babel/preset-env": "^7.2.0",
+    "babel-eslint": "^10.0.1",
+    "babel-plugin-add-module-exports": "^1.0.2",
+    "eslint": "^4.18.2",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-flowtype": "^3.9.1",
+    "eslint-plugin-import": "^2.9.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-standard": "^3.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaiahwong/grpc-utils.git"
+  },
+  "types": "./index.d.ts",
+  "author": "Isaiah Wong <iisaiah.dev@gmail.com>",
+  "license": "MIT"
+}

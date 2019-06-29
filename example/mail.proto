@@ -1,0 +1,21 @@
+syntax = "proto3";
+  
+package mail;
+
+service MailService {
+  rpc SendAccountVerification(AccountVerificationRequest) returns (EmailResponse) {}
+}
+
+message EmailResponse {
+  enum ServingStatus {
+    SUCCESS = 0;
+    FAILED = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+}
+
+message AccountVerificationRequest {
+  string email = 1;
+  string verificationToken = 2;
+}
