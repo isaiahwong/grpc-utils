@@ -17,10 +17,14 @@ class GrpcClient {
    * @param {*} options
    * @param {Number} options.retryDuration ms
    * @param {String} options.serviceURL grpc server url
+   * @param {String} options.rpcMaxRetries max number of rpc call retries
+   * @param {String} options.rpcRetryInterval interval before rpc retries connection
    */
   constructor(protoPath, options = {}) {
     const {
-      retryDuration = Number.POSITIVE_INFINITY // Seconds
+      retryDuration = Number.POSITIVE_INFINITY, // Seconds
+      rpcMaxRetries = 5,
+      rpcRetryInterval = 1500
     } = options;
 
     let { serviceURL } = options;
@@ -59,12 +63,15 @@ class GrpcClient {
     this.requests = {};
     this.service = service;
     this.retryDuration = retryDuration;
+    this.rpcMaxRetries = rpcMaxRetries;
+    this.rpcRetryInterval = rpcRetryInterval;
     this.client = GrpcClient._loadClient(proto, pkg, service, serviceURL);
 
     this._genFnDef();
     this._setupConnectionMiddleware();
 
     this._waitForReady();
+    this.counter = 0;
   }
 
   static _loadClient(proto, _package, service, serviceURL) {
@@ -151,41 +158,52 @@ class GrpcClient {
     });
   }
 
-  createRequest(id) {
-    let _id = id;
+  createRequest(request) {
+    let _id = request && request.id;
     if (!this.requests[_id]) {
       _id = uniqueId('conn');
       this.requests[_id] = {
         id: _id,
-        maxRetries: 10,
+        maxRetries: this.rpcMaxRetries,
         retries: 0,
+        retry() {
+          this.retries += 1;
+        }
       };
     }
     return this.requests[_id];
   }
 
-  resolveRequest(id) {
-    delete this.requests[id];
+  resolveRequest(request) {
+    delete this.requests[request && request.id];
   }
 
   /**
-   * TODO, Reconnect if grpc fails
+   * testConnection
    * @param {*} cb
+   * @returns {Promise} resolves callback
    */
   testConnection(cb) {
-    const channel = this.client.getChannel();
-    const state = channel.getConnectivityState(true);
+    return new Promise((resolve, reject) => {
+      const fn = (existingRequest) => {
+        const request = this.createRequest(existingRequest);
+        const channel = this.client.getChannel();
+        const state = channel.getConnectivityState(true);
+        request.retry();
 
-    switch (state) {
-      case grpc.connectivityState.READY:
-        return cb();
-      case grpc.connectivityState.CONNECTING:
-        throw new ServiceUnavailable(`Disconnected ${this.service}`);
-      case grpc.connectivityState.TRANSIENT_FAILURE:
-        throw new ServiceUnavailable(`Transient Failure ${this.service}`);
-      default:
+        if (state === grpc.connectivityState.READY) {
+          this.resolveRequest(request);
+          return (cb && resolve(cb())) || undefined;
+        }
+        if (request.retries >= request.maxRetries) {
+          this.resolveRequest(request);
+          return reject(new ServiceUnavailable(`Disconnected ${this.service}`));
+        }
+        setTimeout(() => fn(request), this.rpcRetryInterval);
         return null;
-    }
+      };
+      fn();
+    });
   }
 
   _waitForReady() {
