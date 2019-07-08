@@ -193,7 +193,7 @@ class GrpcClient {
       if (err) {
         throw new InternalServerError(err);
       }
-      logger(`Connected to ${this.service}`);
+      logger.info(`Connected to ${this.service}`);
       this.ready = true;
     });
   }
