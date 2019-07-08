@@ -68,7 +68,7 @@ class GrpcClient {
   }
 
   static _loadClient(proto, _package, service, serviceURL) {
-    if (!proto || !proto[_package] || !proto.mail[service]) {
+    if (!proto || !proto[_package] || !proto[_package][service]) {
       throw new InternalServerError(`Error loading ${service} from proto`);
     }
     const client = new proto[_package][service](
