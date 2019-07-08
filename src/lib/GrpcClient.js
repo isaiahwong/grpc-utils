@@ -15,14 +15,14 @@ class GrpcClient {
    * @constructor
    * @param {*} protoPath
    * @param {*} options
-   * @param {Number} options.retryDuration ms
    * @param {String} options.serviceURL grpc server url
-   * @param {String} options.rpcMaxRetries max number of rpc call retries
-   * @param {String} options.rpcRetryInterval interval before rpc retries connection
+   * @param {Number} options.deadline ms
+   * @param {Number} options.rpcMaxRetries max number of rpc call retries
+   * @param {Number} options.rpcRetryInterval ms interval before rpc retries connection
    */
   constructor(protoPath, options = {}) {
     const {
-      retryDuration = Number.POSITIVE_INFINITY, // Seconds
+      deadline = Number.POSITIVE_INFINITY, // Seconds
       rpcMaxRetries = 5,
       rpcRetryInterval = 1500
     } = options;
@@ -62,7 +62,7 @@ class GrpcClient {
     this.rpcDefs = Object.keys(rpcDefs).map(key => rpcDefs[key].originalName);
     this.requests = {};
     this.service = service;
-    this.retryDuration = retryDuration;
+    this.deadline = deadline;
     this.rpcMaxRetries = rpcMaxRetries;
     this.rpcRetryInterval = rpcRetryInterval;
     this.client = GrpcClient._loadClient(proto, pkg, service, serviceURL);
@@ -207,7 +207,7 @@ class GrpcClient {
   }
 
   _waitForReady() {
-    this.client.waitForReady(this.retryDuration, (err) => {
+    this.client.waitForReady(this.deadline, (err) => {
       if (err) {
         throw new InternalServerError(err);
       }

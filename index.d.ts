@@ -5,10 +5,10 @@ export class GrpcClient {
    * @constructor
    * @param {*} protoPath
    * @param {*} options
-   * @param {Number} options.retryDuration ms
    * @param {String} options.serviceURL grpc server url
-   * @param {String} options.rpcMaxRetries max number of rpc call retries
-   * @param {String} options.rpcRetryInterval interval before rpc retries connection
+   * @param {Number} options.deadline ms
+   * @param {Number} options.rpcMaxRetries max number of rpc call retries
+   * @param {Number} options.rpcRetryInterval ms interval before rpc retries connection
    */
     constructor(protoPath: any, options: Object);
 

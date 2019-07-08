@@ -1,9 +1,20 @@
 # GrpcClient
 GrpcClient aims to reduce boilerplate code - writing method definitions for rpc methods. 
 
-GrpcClient will generate rpc methods defined in your proto to class methods. I.E `SendAccountVerification` defined in `mail.proto` - invoke via `klass.sendAccountVerification()`. Each Rpc methods are wrapped with Promises. Refer below for full example.
+GrpcClient will generate rpc methods defined in your proto to class methods. I.E `SendAccountVerification` defined in `mail.proto` - invoke via `klass.sendAccountVerification()`. Each Rpc methods are wrapped in `Promises`. Refer below for full example.
 
-## Usage
+# Api Reference
+`constructor` accept the following params
+
+| Name          | Default | Description    |  
+| ------------- | ---- | -------------- |
+| `protoPath` | `''` (No path) | path to proto file  | 
+| `options.serviceURL`| `SERVICE_NAME:50051` | Remote grpc server url | 
+| `options.deadline`| `Number.POSITIVE_INFINITY` | When to stop waiting for a connection. Pass Infinity to wait forever. | 
+| `options.rpcMaxRetries`| `5` | max number of rpc call retries | 
+| `options.rpcRetryInterval` | `1500` | interval before rpc retries connection |
+
+# Usage
 mail.proto
 ```
 syntax = "proto3";
