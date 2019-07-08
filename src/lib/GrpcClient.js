@@ -15,6 +15,8 @@ class GrpcClient {
    * @constructor
    * @param {*} protoPath
    * @param {*} options
+   * @param {Number} options.retryDuration ms
+   * @param {String} options.serviceURL grpc server url
    */
   constructor(protoPath, options = {}) {
     const {
