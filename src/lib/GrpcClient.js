@@ -1,5 +1,4 @@
 import grpc from 'grpc';
-import { uniqueId } from 'lodash';
 import logger from 'esther';
 import { InternalServerError, ServiceUnavailable } from 'horeb';
 
@@ -28,7 +27,6 @@ class GrpcClient {
     } = options;
 
     let { serviceURL } = options;
-
 
     if (!protoPath) {
       throw new InternalServerError('Proto path undefined');
@@ -97,6 +95,10 @@ class GrpcClient {
   _genFnDef(rpcDefs = this.rpcDefs) {
     rpcDefs.forEach((fnDef) => {
       GrpcClient.prototype[fnDef] = (...args) => new Promise((resolve, reject) => {
+        if (!args[0]) {
+          // eslint-disable-next-line no-param-reassign
+          args[0] = {};
+        }
         this.client[fnDef](...args, (err, res) => {
           if (err) {
             if (err.metadata) {
@@ -161,7 +163,7 @@ class GrpcClient {
   createRequest(request) {
     let _id = request && request.id;
     if (!this.requests[_id]) {
-      _id = uniqueId('conn');
+      _id = Math.random().toString(36).substr(2, 9);
       this.requests[_id] = {
         id: _id,
         maxRetries: this.rpcMaxRetries,
@@ -196,8 +198,9 @@ class GrpcClient {
           return (cb && resolve(cb())) || undefined;
         }
         if (request.retries >= request.maxRetries) {
+          const err = new ServiceUnavailable(`${this.service} unreachable. Max tries:${request.maxRetries}`);
           this.resolveRequest(request);
-          return reject(new ServiceUnavailable(`Disconnected ${this.service}`));
+          return reject(err);
         }
         setTimeout(() => fn(request), this.rpcRetryInterval);
         return null;
