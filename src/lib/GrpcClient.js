@@ -102,11 +102,16 @@ class GrpcClient {
         this.client[fnDef](...args, (err, res) => {
           if (err) {
             if (err.metadata) {
-              const errors = decodeMetadata('errors', err.metadata);
-              // eslint-disable-next-line no-param-reassign
-              err.errors = errors;
+              try {
+                const errors = decodeMetadata('errors', err.metadata);
+                // eslint-disable-next-line no-param-reassign
+                err.errors = errors;
+                return reject(err);
+              }
+              catch (parseErr) {
+                return reject(new InternalServerError(parseErr.message));
+              }
             }
-            return reject(err);
           }
           return resolve(res);
         });
