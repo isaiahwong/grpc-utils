@@ -24,6 +24,10 @@ export function decodeArrayMetadata(...args: any[]): any;
 
 export function encodeArrayMetadata(...args: any[]): any;
 
+export function decodeMetadata(...args: any[]): any;
+
+export function encodeMetadata(...args: any[]): any;
+
 export function load(filename: any, options: any): any;
 
 export function loadSync(filename: any, options: any): any;
