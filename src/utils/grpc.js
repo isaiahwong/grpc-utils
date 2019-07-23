@@ -10,7 +10,7 @@ import { InternalServerError } from 'horeb';
  * @param {Any} data data to be encoded
  */
 export function encodeMetadata(key = 'data', obj) {
-  if (!Buffer.isBuffer(obj)) {
+  if (Buffer.isBuffer(obj)) {
     throw new InternalServerError('Object is of type buffer | byte');
   }
 
