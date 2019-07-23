@@ -6,8 +6,8 @@ Grpc utils provides helper functions and classes for gprc operations
 | Name          | Description    |  
 | ------------- | -------------- |
 | [`GrpcClient`](#GrpcClient)| grpc client helper | 
-| `encodeArrayMetadata`| Encodes `Array` to be stored in grpc.Metadata | 
-| `decodeArrayMetadata`| Decodes data encoded with `encodeArrayMetadata`| 
+| `encodeMetadata`| Encodes `Any` data to be stored in grpc.Metadata | 
+| `decodeMetadata`| Decodes data encoded with `encodeMetadata`| 
 | `grpcLoader.loadProto`| Loads a one proto file | 
 | `grpcLoader.loadProto`| Loads an array of proto files | 
 

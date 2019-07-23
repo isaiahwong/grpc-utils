@@ -7,22 +7,15 @@ import { InternalServerError } from 'horeb';
  * Encodes array to Buffer
  * For storing data in grpc.Metadata
  * @param {String} key key that maps to value
- * @param {Array} arr array to be encoded
+ * @param {Any} data data to be encoded
  */
-export function encodeArrayMetadata(key = 'data', arr) {
-  if (!Array.isArray(arr)) {
-    throw new InternalServerError('Arg supplied is not an array');
+export function encodeMetadata(key = 'data', obj) {
+  if (!Buffer.isBuffer(obj)) {
+    throw new InternalServerError('Object is of type buffer | byte');
   }
 
   const metadata = new grpc.Metadata();
-  arr.forEach((detail, i) => {
-    if (i) {
-      metadata.add(`${key}-bin`, Buffer.from(JSON.stringify(detail)));
-    }
-    else {
-      metadata.set(`${key}-bin`, Buffer.from(JSON.stringify(detail)));
-    }
-  });
+  metadata.set(`${key}-bin`, Buffer.from(JSON.stringify(obj)));
 
   return metadata;
 }
@@ -33,16 +26,32 @@ export function encodeArrayMetadata(key = 'data', arr) {
  * @param {String} key that maps to value
  * @param {grpc.Metadata} metadata to be decoded
  */
-export function decodeArrayMetadata(key = 'data', metadata) {
+export function decodeMetadata(key = '', metadata) {
   if (!(metadata instanceof grpc.Metadata)) {
     throw new InternalServerError('Arg supplied is not of type grpc.Metadata');
   }
+  const data = metadata.get(`${key}-bin`);
+  return JSON.parse(data.toString());
+}
 
-  const details = metadata.get(`${key}-bin`);
-  if (!Array.isArray(details)) {
-    logger.warn('key value is not an array');
-    return [];
-  }
+/**
+ * Encodes array to Buffer
+ * For storing data in grpc.Metadata
+ * @param {String} key key that maps to value
+ * @param {Array} arr array to be encoded
+ */
+export function encodeArrayMetadata(key = 'data', arr) {
+  logger.warn('encodeArrayMetadata is deprecated. Use encodeMetadata Instead');
+  return encodeMetadata(key, arr);
+}
 
-  return details.map(detail => JSON.parse(detail.toString()));
+/**
+ * Decodes array to Buffer
+ * For storing data in grpc.Metadata
+ * @param {String} key that maps to value
+ * @param {grpc.Metadata} metadata to be decoded
+ */
+export function decodeArrayMetadata(key = 'data', metadata) {
+  logger.warn('decodeArrayMetadata is deprecated. Use decodeMetadata Instead');
+  return decodeMetadata(key, metadata);
 }

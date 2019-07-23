@@ -1,10 +1,11 @@
 {
   "name": "grpc-utils",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Useful helpers for grpc ops",
   "main": "build/index.js",
   "scripts": {
-    "build": "rm -rf build && babel src -d build"
+    "build": "rm -rf build && babel src -d build",
+    "example:client": "babel-node ./example/client.js"
   },
   "husky": {
     "hooks": {

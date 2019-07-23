@@ -3,7 +3,7 @@ import logger from 'esther';
 import { InternalServerError, ServiceUnavailable } from 'horeb';
 
 import grpcLoader from './grpcLoader';
-import { decodeArrayMetadata } from '../utils/grpc';
+import { decodeMetadata } from '../utils/grpc';
 
 /**
  * `GrpcClient` is a client helper class that connects to rpc servers.
@@ -102,7 +102,7 @@ class GrpcClient {
         this.client[fnDef](...args, (err, res) => {
           if (err) {
             if (err.metadata) {
-              const errors = decodeArrayMetadata('errors', err.metadata);
+              const errors = decodeMetadata('errors', err.metadata);
               // eslint-disable-next-line no-param-reassign
               err.errors = errors;
             }
@@ -198,7 +198,7 @@ class GrpcClient {
           return (cb && resolve(cb())) || undefined;
         }
         if (request.retries >= request.maxRetries) {
-          const err = new ServiceUnavailable(`${this.service} unreachable. Max tries:${request.maxRetries}`);
+          const err = new ServiceUnavailable(`${this.service} unreachable. Max tries: ${request.maxRetries}`);
           this.resolveRequest(request);
           return reject(err);
         }
