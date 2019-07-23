@@ -101,7 +101,7 @@ class GrpcClient {
         }
         this.client[fnDef](...args, (err, res) => {
           if (err) {
-            if (err.metadata && err.metadata.get && err.metadata.get('errors').length) {
+            if (err.metadata && err.metadata.get && err.metadata.get('errors-bin').length) {
               try {
                 const errors = decodeMetadata('errors', err.metadata);
                 // eslint-disable-next-line no-param-reassign
