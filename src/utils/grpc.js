@@ -27,11 +27,15 @@ export function encodeMetadata(key = 'data', obj) {
  * @param {grpc.Metadata} metadata to be decoded
  */
 export function decodeMetadata(key = '', metadata) {
-  if (!(metadata instanceof grpc.Metadata)) {
+  if (!metadata.get) {
     throw new InternalServerError('Arg supplied is not of type grpc.Metadata');
   }
   const data = metadata.get(`${key}-bin`);
-  return JSON.parse(data.toString());
+  if (!Array.isArray(data) || !data.length) {
+    return null;
+  }
+
+  return data.map(d => JSON.parse(d.toString()))[0];
 }
 
 /**
