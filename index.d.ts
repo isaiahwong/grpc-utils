@@ -9,6 +9,7 @@ export class GrpcClient {
    * @param {Number} options.deadline ms
    * @param {Number} options.rpcMaxRetries max number of rpc call retries
    * @param {Number} options.rpcRetryInterval ms interval before rpc retries connection
+   * @param {Number} options.rpcDeadline epoch rpc deadline i.e Date.now() + 1000
    */
     constructor(protoPath: any, options: Object);
 

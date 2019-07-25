@@ -5,7 +5,6 @@ import { InternalServerError, ServiceUnavailable } from 'horeb';
 import grpcLoader from './grpcLoader';
 import { decodeMetadata } from '../utils/grpc';
 
-
 /**
  * `GrpcClient` is a client helper class that connects to rpc servers.
  * GrpcClient should only process one service
@@ -19,12 +18,14 @@ class GrpcClient {
    * @param {Number} options.deadline ms
    * @param {Number} options.rpcMaxRetries max number of rpc call retries
    * @param {Number} options.rpcRetryInterval ms interval before rpc retries connection
+   * @param {Number} options.rpcDeadline epoch rpc deadline i.e Date.now() + 1000
    */
   constructor(protoPath, options = {}) {
     const {
       deadline = Number.POSITIVE_INFINITY, // Seconds
       rpcMaxRetries = 5,
-      rpcRetryInterval = 1500
+      rpcRetryInterval = 1500,
+      rpcDeadline = 15000
     } = options;
 
     logger.init({
@@ -66,6 +67,7 @@ class GrpcClient {
     this.deadline = deadline;
     this.rpcMaxRetries = rpcMaxRetries;
     this.rpcRetryInterval = rpcRetryInterval;
+    this.rpcDeadline = rpcDeadline;
     this.client = GrpcClient._loadClient(proto, pkg, service, serviceURL);
 
     this._genFnDef();
@@ -115,10 +117,21 @@ class GrpcClient {
   _genFnDef(rpcDefs = this.rpcDefs) {
     rpcDefs.forEach((fnDef) => {
       GrpcClient.prototype[fnDef] = (...args) => new Promise((resolve, reject) => {
+        // params
         if (!args[0]) {
           // eslint-disable-next-line no-param-reassign
           args[0] = {};
         }
+        // options
+        if (!args[2]) {
+          // eslint-disable-next-line no-param-reassign
+          args[2] = {};
+        }
+        if (!args[2].deadline) {
+          // eslint-disable-next-line no-param-reassign
+          args[2].deadline = Date.now() + this.rpcDeadline;
+        }
+
         this.client[fnDef](...args, (err, res) => {
           if (err) {
             if (err.metadata && err.metadata.get && err.metadata.get('errors-bin').length) {
