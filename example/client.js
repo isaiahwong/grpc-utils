@@ -17,4 +17,11 @@ function test() {
   service.testConnection().catch(err => logger.error(err));
 }
 
+// Try rpc method
+// Set deadline for each call
+// catch failed to connect
+// testconnection
+// kill connection
+
+
 setTimeout(() => test(), 2000);

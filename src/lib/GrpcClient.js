@@ -5,6 +5,7 @@ import { InternalServerError, ServiceUnavailable } from 'horeb';
 import grpcLoader from './grpcLoader';
 import { decodeMetadata } from '../utils/grpc';
 
+
 /**
  * `GrpcClient` is a client helper class that connects to rpc servers.
  * GrpcClient should only process one service
@@ -26,14 +27,16 @@ class GrpcClient {
       rpcRetryInterval = 1500
     } = options;
 
-    let { serviceURL } = options;
+    logger.init({
+      disableStackTrace: true
+    });
 
+    let { serviceURL } = options;
     if (!protoPath) {
       throw new InternalServerError('Proto path undefined');
     }
 
     const proto = grpcLoader.loadProto(protoPath);
-
     if (!proto) {
       throw new InternalServerError(`Error loading ${protoPath}`);
     }
@@ -87,6 +90,23 @@ class GrpcClient {
     return client;
   }
 
+  static recordStartTime() {
+    return process.hrtime();
+  }
+
+  static getResponseTime(start) {
+    if (!start) {
+      return '';
+    }
+    const end = process.hrtime(start);
+    const nanoseconds = (end[0] * 1e9) + end[1];
+    return nanoseconds / 1e6;
+  }
+
+  set verbose(bool) {
+    this._verbose = !!bool;
+  }
+
   /**
    * Generates `function` definitions from rpc service defined in proto.
    * Functions will be genereted for `GrpcClient` or `inherited` classes.
@@ -121,40 +141,6 @@ class GrpcClient {
   }
 
   /**
-   * Setup a fns to be called before each grpc call
-   * @param {*} proto
-   * @param {Object} options
-   * @param {String} options._package Proto package name
-   * @param {String} options.service Proto service name
-   * @param {Array} options.middlewares Middleware fns
-   * @param {Array} options.fnAddOns Additional fns that you want to include to middleware
-   */
-  // _setupMiddleware(proto, options) {
-  //   let { fnAddOns, middlewares } = options;
-
-  //   fnAddOns = fnAddOns || [];
-  //   middlewares = middlewares || [];
-  //   // Only apply middleware to grpc fns call
-  //   const fns = [
-  //     intersection(GrpcClient.getAllPropertyNames(this), this.fnsDef),
-  //     ...fnAddOns
-  //   ];
-
-  //   middlewares = middlewares
-  //     .filter(fn => typeof fn === 'function')
-  //     .map(fn => fn.bind(this));
-
-  //   fns.forEach((key) => {
-  //     const initialFn = this[key].bind(this);
-  //     this[key] = function mixin() {
-  //       middlewares.forEach(fn => fn());
-  //       // eslint-disable-next-line prefer-rest-params
-  //       return initialFn.apply(this, arguments);
-  //     };
-  //   });
-  // }
-
-  /**
    * `_setupConnectionMiddleware` ensures that `testConnection` will be called before
    * each grpc call to check if client connection is up. It iterates the rpcDefs defined
    * in class and calls `testConnection` before each rpc function is called.
@@ -162,7 +148,19 @@ class GrpcClient {
   _setupConnectionMiddleware(rpcDefs = this.rpcDefs) {
     rpcDefs.forEach((key) => {
       const initialFn = this[key].bind(this);
-      this[key] = (...args) => this.testConnection(() => initialFn(...args));
+      this[key] = (...args) => this.testConnection((extend) => {
+        const options = args[2];
+        if (extend
+          && options
+          && options.deadline
+          && typeof options.deadline === 'number'
+        ) {
+          // extends grpc calld deadline
+          // eslint-disable-next-line no-param-reassign
+          args[2].deadline += extend;
+        }
+        return initialFn(...args);
+      });
     });
   }
 
@@ -191,28 +189,46 @@ class GrpcClient {
    * @param {*} cb
    * @returns {Promise} resolves callback
    */
-  testConnection(cb) {
-    return new Promise((resolve, reject) => {
-      const fn = (existingRequest) => {
-        const request = this.createRequest(existingRequest);
-        const channel = this.client.getChannel();
-        const state = channel.getConnectivityState(true);
-        request.retry();
+  async testConnection(cb) {
+    try {
+      const res = await cb();
+      return res;
+    }
+    catch (err) {
+      if (err.code !== grpc.status.UNAVAILABLE) {
+        throw err;
+      }
+      logger.error(err, { isHandledError: true });
+      logger.warn('Will try to reconnect');
+      const start = GrpcClient.recordStartTime();
 
-        if (state === grpc.connectivityState.READY) {
-          this.resolveRequest(request);
-          return (cb && resolve(cb())) || undefined;
-        }
-        if (request.retries >= request.maxRetries) {
-          const err = new ServiceUnavailable(`${this.service} unreachable. Max tries: ${request.maxRetries}`);
-          this.resolveRequest(request);
-          return reject(err);
-        }
-        setTimeout(() => fn(request), this.rpcRetryInterval);
-        return null;
-      };
-      fn();
-    });
+      return new Promise((resolve, reject) => {
+        const connect = (existingRequest) => {
+          const request = this.createRequest(existingRequest);
+          const channel = this.client.getChannel();
+          const state = channel.getConnectivityState(true);
+
+          if (state === grpc.connectivityState.READY) {
+            this.resolveRequest(request);
+            // extends grpc call deadline
+            const extend = GrpcClient.getResponseTime(start);
+            return (cb && resolve(cb(extend))) || undefined;
+          }
+          // Increments request retries
+          request.retry();
+          if (this._verbose) logger.info(request);
+          if (request.retries >= request.maxRetries) {
+            const unavailableErr = new ServiceUnavailable(`${this.service} unreachable. Max tries: ${request.maxRetries}`);
+            this.resolveRequest(request);
+            return reject(unavailableErr);
+          }
+          // calls fn recursively
+          setTimeout(() => connect(request), this.rpcRetryInterval);
+          return null;
+        };
+        connect();
+      });
+    }
   }
 
   _waitForReady() {
@@ -224,6 +240,40 @@ class GrpcClient {
       this.ready = true;
     });
   }
+
+  /**
+  * Setup a fns to be called before each grpc call
+  * @param {*} proto
+  * @param {Object} options
+  * @param {String} options._package Proto package name
+  * @param {String} options.service Proto service name
+  * @param {Array} options.middlewares Middleware fns
+  * @param {Array} options.fnAddOns Additional fns that you want to include to middleware
+  */
+  // _setupMiddleware(proto, options) {
+  //   let { fnAddOns, middlewares } = options;
+
+  //   fnAddOns = fnAddOns || [];
+  //   middlewares = middlewares || [];
+  //   // Only apply middleware to grpc fns call
+  //   const fns = [
+  //     intersection(GrpcClient.getAllPropertyNames(this), this.fnsDef),
+  //     ...fnAddOns
+  //   ];
+
+  //   middlewares = middlewares
+  //     .filter(fn => typeof fn === 'function')
+  //     .map(fn => fn.bind(this));
+
+  //   fns.forEach((key) => {
+  //     const initialFn = this[key].bind(this);
+  //     this[key] = function mixin() {
+  //       middlewares.forEach(fn => fn());
+  //       // eslint-disable-next-line prefer-rest-params
+  //       return initialFn.apply(this, arguments);
+  //     };
+  //   });
+  // }
 }
 
 export default GrpcClient;
