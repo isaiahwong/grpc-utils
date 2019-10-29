@@ -1,6 +1,6 @@
 {
   "name": "grpc-utils",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Useful helpers for grpc ops",
   "main": "build/index.js",
   "scripts": {
@@ -13,9 +13,10 @@
     }
   },
   "dependencies": {
-    "esther": "^1.0.7",
+    "@babel/polyfill": "^7.6.0",
+    "esther": "^1.0.9",
     "grpc": "^1.22.2",
-    "horeb": "^1.0.0",
+    "horeb": "^1.1.2",
     "lodash": "^4.17.14",
     "protobufjs": "^6.8.8"
   },
