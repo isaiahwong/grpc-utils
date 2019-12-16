@@ -4,6 +4,14 @@ import { InternalServerError } from 'horeb';
 
 import * as protoLoader from './protoLoader';
 
+function appendTrailingSlash(str = '') {
+  let _str = str;
+  if (str.charAt(str.length - 1) !== '/') {
+    _str = `${str}/`;
+  }
+  return _str;
+}
+
 function loadProto(filePath, include) {
   const options = {
     keepCase: true,
@@ -38,13 +46,14 @@ function loadProtos(protos = [], filePath, relativeInclude) {
   fs
     .readdirSync(filePath)
     .forEach((fileName) => {
-      if (!fs.statSync(filePath + fileName).isFile()) { // Folder
-        loadProtos(protos, `${filePath}${fileName}/`, relativeInclude);
+      const fullPath = appendTrailingSlash(filePath) + fileName;
+      if (!fs.statSync(fullPath).isFile()) { // Folder
+        loadProtos(protos, fullPath, relativeInclude);
       }
       else if (fileName.match(/\.proto$/) && !filePath.match(/third_party/)) { // exclude third party
         const proto = (!relativeInclude || !relativeInclude.length)
-          ? loadProto(filePath + fileName)
-          : loadProto(filePath + fileName, relativeInclude);
+          ? loadProto(fullPath)
+          : loadProto(fullPath, relativeInclude);
         protos.push(proto);
       }
     });
