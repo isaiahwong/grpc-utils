@@ -1,8 +1,4 @@
 /* eslint-disable */
-/**
- * https://www.npmjs.com/package/@grpc/proto-loader
- * Forked proto-loader to gain more control over proto objects 
- */
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
@@ -22,130 +18,166 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * limitations under the License.
  *
  */
-var Protobuf = require("protobufjs");
 var fs = require("fs");
 var path = require("path");
-var _ = require("lodash");
+var Protobuf = require("protobufjs");
+var descriptor = require("protobufjs/ext/descriptor");
+var camelCase = require("lodash.camelcase");
+var { isEmpty } = require("lodash");
+
+var descriptorOptions = {
+    longs: String,
+    enums: String,
+    bytes: String,
+    defaults: true,
+    oneofs: true,
+    json: true
+};
 function joinName(baseName, name) {
-  if (baseName === '') {
-    return name;
-  }
-  else {
-    return baseName + '.' + name;
-  }
+    if (baseName === '') {
+        return name;
+    }
+    else {
+        return baseName + '.' + name;
+    }
 }
-function getAllServices(obj, parentName) {
-  var objName = joinName(parentName, obj.name);
-  if (obj.hasOwnProperty('methods')) {
-    return [[objName, obj]];
-  }
-  else {
-    return obj.nestedArray.map(function (child) {
-      if (child.hasOwnProperty('nested')) {
-        return getAllServices(child, objName);
-      }
-      else {
-        return [];
-      }
-    }).reduce(function (accumulator, currentValue) { return accumulator.concat(currentValue); }, []);
-  }
+function isHandledReflectionObject(obj) {
+    return obj instanceof Protobuf.Service || obj instanceof Protobuf.Type ||
+        obj instanceof Protobuf.Enum;
+}
+function isNamespaceBase(obj) {
+    return obj instanceof Protobuf.Namespace || obj instanceof Protobuf.Root;
+}
+function getAllHandledReflectionObjects(obj, parentName) {
+    var objName = joinName(parentName, obj.name);
+    if (isHandledReflectionObject(obj)) {
+        return [[objName, obj]];
+    }
+    else {
+        if (isNamespaceBase(obj) && typeof obj.nested !== 'undefined') {
+            return Object.keys(obj.nested)
+                .map(function (name) {
+                return getAllHandledReflectionObjects(obj.nested[name], objName);
+            })
+                .reduce(function (accumulator, currentValue) { return accumulator.concat(currentValue); }, []);
+        }
+    }
+    return [];
 }
 function createDeserializer(cls, options) {
-  return function deserialize(argBuf) {
-    return cls.toObject(cls.decode(argBuf), options);
-  };
+    return function deserialize(argBuf) {
+        return cls.toObject(cls.decode(argBuf), options);
+    };
 }
 function createSerializer(cls) {
-  return function serialize(arg) {
-    var message = cls.fromObject(arg);
-    return cls.encode(message).finish();
-  };
+    return function serialize(arg) {
+        var message = cls.fromObject(arg);
+        return cls.encode(message).finish();
+    };
 }
-function createMethodDefinition(method, serviceName, options) {
-  return {
-    path: '/' + serviceName + '/' + method.name,
-    requestStream: !!method.requestStream,
-    responseStream: !!method.responseStream,
-    requestSerialize: createSerializer(method.resolvedRequestType),
-    requestDeserialize: createDeserializer(method.resolvedRequestType, options),
-    responseSerialize: createSerializer(method.resolvedResponseType),
-    responseDeserialize: createDeserializer(method.resolvedResponseType, options),
-    // TODO(murgatroid99): Find a better way to handle this
-    originalName: _.camelCase(method.name),
-    httpEndpoints: mapHttpOptions(method.options),
-    resolvedRequestType: method.resolvedRequestType,
-    resolvedResponseType: method.resolvedResponseType
-  };
+function createMethodDefinition(method, serviceName, options, fileDescriptors) {
+    /* This is only ever called after the corresponding root.resolveAll(), so we
+     * can assume that the resolved request and response types are non-null */
+    var requestType = method.resolvedRequestType;
+    var responseType = method.resolvedResponseType;
+    return {
+        path: '/' + serviceName + '/' + method.name,
+        requestStream: !!method.requestStream,
+        responseStream: !!method.responseStream,
+        requestSerialize: createSerializer(requestType),
+        requestDeserialize: createDeserializer(requestType, options),
+        responseSerialize: createSerializer(responseType),
+        responseDeserialize: createDeserializer(responseType, options),
+        // TODO(murgatroid99): Find a better way to handle this
+        originalName: camelCase(method.name),
+        httpEndpoints: mapHttpOptions(method.options),
+        requestType: createMessageDefinition(requestType, fileDescriptors),
+        responseType: createMessageDefinition(responseType, fileDescriptors)
+    };
 }
-function createServiceDefinition(service, name, options) {
-  var def = {};
-  for (var _i = 0, _a = service.methodsArray; _i < _a.length; _i++) {
-    var method = _a[_i];
-    def[method.name] = createMethodDefinition(method, name, options);
-  }
-  return def;
-}
-function createPackageDefinition(root, options) {
-  var def = {};
-  for (var _i = 0, _a = getAllServices(root, ''); _i < _a.length; _i++) {
-    var _b = _a[_i], name = _b[0], service = _b[1];
-    def[name] = createServiceDefinition(service, name, options);
-  }
-  return def;
-}
-function addIncludePathResolver(root, includePaths) {
-  root.resolvePath = function (origin, target) {
-    for (var _i = 0, includePaths_1 = includePaths; _i < includePaths_1.length; _i++) {
-      var directory = includePaths_1[_i];
-      var fullPath = path.join(directory, target);
-      try {
-        fs.accessSync(fullPath, fs.constants.R_OK);
-        return fullPath;
-      }
-      catch (err) {
-        continue;
-      }
+function createServiceDefinition(service, name, options, fileDescriptors) {
+    var def = {};
+    for (var _i = 0, _a = service.methodsArray; _i < _a.length; _i++) {
+        var method = _a[_i];
+        def[method.name] =
+            createMethodDefinition(method, name, options, fileDescriptors);
     }
-    return null;
-  };
+    return def;
+}
+function createMessageDefinition(message, fileDescriptors) {
+    var messageDescriptor = message.toDescriptor('proto3');
+    return {
+        format: 'Protocol Buffer 3 DescriptorProto',
+        type: messageDescriptor.$type.toObject(messageDescriptor, descriptorOptions),
+        fileDescriptorProtos: fileDescriptors
+    };
+}
+function createEnumDefinition(enumType, fileDescriptors) {
+    var enumDescriptor = enumType.toDescriptor('proto3');
+    return {
+        format: 'Protocol Buffer 3 EnumDescriptorProto',
+        type: enumDescriptor.$type.toObject(enumDescriptor, descriptorOptions),
+        fileDescriptorProtos: fileDescriptors
+    };
 }
 /**
- * @author isaiahwong
- * @param {*} options 
+ * function createDefinition(obj: Protobuf.Service, name: string, options:
+ * Options): ServiceDefinition; function createDefinition(obj: Protobuf.Type,
+ * name: string, options: Options): MessageTypeDefinition; function
+ * createDefinition(obj: Protobuf.Enum, name: string, options: Options):
+ * EnumTypeDefinition;
  */
-function mapHttpOptions(options) {
-  if (!options) {
-    return;
-  }
-  const httpMethods = {
-    get: 'get',
-    put: 'put',
-    post: 'post',
-    delete: 'delete',
-    patch: 'patch',
-  }
-  const httpOptions = Object.keys(options).reduce((accum, key) => {
-    if (!key.match('http.')) {
-      return accum;
+function createDefinition(obj, name, options, fileDescriptors) {
+    if (obj instanceof Protobuf.Service) {
+        return createServiceDefinition(obj, name, options, fileDescriptors);
     }
-    const method = httpMethods[key.replace('http.', '')];
-    if (method) {
-      accum.path = options[key];
-      accum.method = method;
+    else if (obj instanceof Protobuf.Type) {
+        return createMessageDefinition(obj, fileDescriptors);
     }
-    if (key.match('body')) {
-      accum.body = options[key];
+    else if (obj instanceof Protobuf.Enum) {
+        return createEnumDefinition(obj, fileDescriptors);
     }
-
-    return accum;
-
-  }, {})
-  return _.isEmpty(httpOptions) ? null : httpOptions;
+    else {
+        throw new Error('Type mismatch in reflection object handling');
+    }
+}
+function createPackageDefinition(root, options) {
+    var def = {};
+    root.resolveAll();
+    var descriptorList = root.toDescriptor('proto3').file;
+    var bufferList = descriptorList.map(function (value) {
+        return Buffer.from(descriptor.FileDescriptorProto.encode(value).finish());
+    });
+    for (var _i = 0, _a = getAllHandledReflectionObjects(root, ''); _i < _a.length; _i++) {
+        var _b = _a[_i], name = _b[0], obj = _b[1];
+        def[name] = createDefinition(obj, name, options, bufferList);
+    }
+    return def;
+}
+function addIncludePathResolver(root, includePaths) {
+    var originalResolvePath = root.resolvePath;
+    root.resolvePath = function (origin, target) {
+        if (path.isAbsolute(target)) {
+            return target;
+        }
+        for (var _i = 0, includePaths_1 = includePaths; _i < includePaths_1.length; _i++) {
+            var directory = includePaths_1[_i];
+            var fullPath = path.join(directory, target);
+            try {
+                fs.accessSync(fullPath, fs.constants.R_OK);
+                return fullPath;
+            }
+            catch (err) {
+                continue;
+            }
+        }
+        return originalResolvePath(origin, target);
+    };
 }
 /**
  * Load a .proto file with the specified options.
- * @param filename The file path to load. Can be an absolute path or relative to
- *     an include path.
+ * @param filename One or multiple file paths to load. Can be an absolute path
+ *     or relative to an include path.
  * @param options.keepCase Preserve field names. The default is to change them
  *     to camel case.
  * @param options.longs The type that should be used to represent `long` values.
@@ -167,31 +199,78 @@ function mapHttpOptions(options) {
  * @param options.includeDirs Paths to search for imported `.proto` files.
  */
 function load(filename, options) {
-  var root = new Protobuf.Root();
-  if (!!options.includeDirs) {
-    if (!(options.includeDirs instanceof Array)) {
-      return Promise.reject(new Error('The includeDirs option must be an array'));
+    var root = new Protobuf.Root();
+    options = options || {};
+    if (!!options.includeDirs) {
+        if (!(Array.isArray(options.includeDirs))) {
+            return Promise.reject(new Error('The includeDirs option must be an array'));
+        }
+        addIncludePathResolver(root, options.includeDirs);
     }
-    addIncludePathResolver(root, options.includeDirs);
-  }
-
-  return root.load(filename, options).then(function (loadedRoot) {
-    loadedRoot.resolveAll();
-    return createPackageDefinition(root, options);
-  });
+    return root.load(filename, options).then(function (loadedRoot) {
+        loadedRoot.resolveAll();
+        return createPackageDefinition(root, options);
+    });
 }
 exports.load = load;
 function loadSync(filename, options) {
-  var root = new Protobuf.Root();
-  if (!!options.includeDirs) {
-    if (!(options.includeDirs instanceof Array)) {
-      throw new Error('The include option must be an array');
+    var root = new Protobuf.Root();
+    options = options || {};
+    if (!!options.includeDirs) {
+        if (!(Array.isArray(options.includeDirs))) {
+            throw new Error('The includeDirs option must be an array');
+        }
+        addIncludePathResolver(root, options.includeDirs);
     }
-    addIncludePathResolver(root, options.includeDirs);
-  }
-  var loadedRoot = root.loadSync(filename, options);
-  loadedRoot.resolveAll();
-  return createPackageDefinition(root, options);
+    var loadedRoot = root.loadSync(filename, options);
+    loadedRoot.resolveAll();
+    return createPackageDefinition(root, options);
 }
 exports.loadSync = loadSync;
-//# sourceMappingURL=index.js.map
+// Load Google's well-known proto files that aren't exposed by Protobuf.js.
+{
+    // Protobuf.js exposes: any, duration, empty, field_mask, struct, timestamp,
+    // and wrappers. compiler/plugin is excluded in Protobuf.js and here.
+    var wellKnownProtos = ['api', 'descriptor', 'source_context', 'type'];
+    var sourceDir = path.join(path.dirname(require.resolve('protobufjs')), 'google', 'protobuf');
+    for (var _i = 0, wellKnownProtos_1 = wellKnownProtos; _i < wellKnownProtos_1.length; _i++) {
+        var proto = wellKnownProtos_1[_i];
+        var file = path.join(sourceDir, proto + ".proto");
+        var descriptor_1 = Protobuf.loadSync(file).toJSON();
+        // @ts-ignore
+        Protobuf.common(proto, descriptor_1.nested.google.nested);
+    }
+}
+/**
+ * @author isaiahwong
+ * @param {*} options 
+ */
+function mapHttpOptions(options) {
+    if (!options) {
+      return;
+    }
+    const httpMethods = {
+      get: 'get',
+      put: 'put',
+      post: 'post',
+      delete: 'delete',
+      patch: 'patch',
+    }
+    const httpOptions = Object.keys(options).reduce((accum, key) => {
+      if (!key.match('http.')) {
+        return accum;
+      }
+      const method = httpMethods[key.replace('http.', '')];
+      if (method) {
+        accum.path = options[key];
+        accum.method = method;
+      }
+      if (key.match('body')) {
+        accum.body = options[key];
+      }
+  
+      return accum;
+  
+    }, {})
+    return isEmpty(httpOptions) ? null : httpOptions;
+  }
