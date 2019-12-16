@@ -1,6 +1,6 @@
 {
   "name": "grpc-utils",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Useful helpers for grpc ops",
   "main": "build/index.js",
   "scripts": {

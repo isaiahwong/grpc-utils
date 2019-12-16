@@ -30,10 +30,9 @@ function loadProto(filePath, include) {
 
 /**
  * Loads proto files
- * @param {Array}
+ * @param {Array} protos adds proto by reference
  * @param {String} filePath Dir
  * @param {Array} relativeInclude Directory has to be relative to where it is being loaded from
- * @returns {Array} protos
  */
 function loadProtos(protos = [], filePath, relativeInclude) {
   fs
@@ -45,7 +44,7 @@ function loadProtos(protos = [], filePath, relativeInclude) {
       else if (fileName.match(/\.proto$/) && !filePath.match(/third_party/)) { // exclude third party
         const proto = (!relativeInclude || !relativeInclude.length)
           ? loadProto(filePath + fileName)
-          : loadProto(fileName, relativeInclude);
+          : loadProto(filePath + fileName, relativeInclude);
         protos.push(proto);
       }
     });

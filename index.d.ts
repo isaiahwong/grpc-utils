@@ -34,9 +34,21 @@ export function load(filename: any, options: any): any;
 export function loadSync(filename: any, options: any): any;
 
 export namespace grpcLoader {
-    function loadProto(fileName: any, include: any): any;
+    /**
+     * Loads proto file
+     * @param {String} fileName 
+     * @param {Array} filePath Dir
+     * @returns {Object} proto
+     */ 
+    function loadProto(fileName: string, include: string[]): any;
 
-    function loadProtos(...args: any[]): void;
+    /**
+     * Loads proto files
+     * @param {Array} protos adds proto by reference
+     * @param {String} filePath Dir
+     * @param {Array} relativeInclude Directory has to be relative to where it is being loaded from
+     */
+    function loadProtos(protos: string[], filePath: string, relativeInclude: string[]): void;
 
 }
 
