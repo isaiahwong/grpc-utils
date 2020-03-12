@@ -22,6 +22,7 @@ class GrpcClient {
    */
   constructor(protoPath, options = {}) {
     const {
+      relativeInclude,
       deadline = Number.POSITIVE_INFINITY, // Seconds
       rpcMaxRetries = 5,
       rpcRetryInterval = 1500,
@@ -37,7 +38,9 @@ class GrpcClient {
       throw new InternalServerError('Proto path undefined');
     }
 
-    const proto = grpcLoader.loadProto(protoPath);
+    const proto = (!relativeInclude || !relativeInclude.length)
+      ? grpcLoader.loadProto(protoPath)
+      : grpcLoader.loadProto(protoPath, relativeInclude);
     if (!proto) {
       throw new InternalServerError(`Error loading ${protoPath}`);
     }
