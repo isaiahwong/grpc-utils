@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package api.accounts.v1;
+
+option go_package = "accounts";
+
+import "google/api/annotations.proto";
+
+import "accounts/v1/schema.proto";
+
+service AccountsService {
+  rpc IsAuthenticated(Empty) returns (AuthenticateResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts",
+    };
+  }
+
+  rpc SignUp(SignUpRequest) returns (UserResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/signup",
+    };
+  }
+
+  rpc Login(LoginRequest) returns (UserResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/login",
+    };
+  }
+}
+
+message Empty {}
+
+message AuthenticateResponse {
+  bool status = 1;
+}
+
+message SignUpRequest {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+  string password = 4;
+  string confirm_password = 5;
+  string captcha_token = 6;
+  string ip = 7;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+  string captcha_token = 3;
+  string challenge = 4;
+}
+
+message UserResponse {
+  User user = 1;
+}

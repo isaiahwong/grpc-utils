@@ -13,16 +13,18 @@ class GrpcClient {
   /**
    * @constructor
    * @param {*} protoPath
+   * @param {String} packageDef
    * @param {*} options
+   * @param {Array}  options.includeDirs Paths to search for imported `.proto` files.
    * @param {String} options.serviceURL grpc server url
    * @param {Number} options.deadline ms
    * @param {Number} options.rpcMaxRetries max number of rpc call retries
    * @param {Number} options.rpcRetryInterval ms interval before rpc retries connection
    * @param {Number} options.rpcDeadline epoch rpc deadline i.e Date.now() + 1000
    */
-  constructor(protoPath, options = {}) {
+  constructor(protoPath, packageDef, options = {}) {
     const {
-      relativeInclude,
+      includeDirs,
       deadline = Number.POSITIVE_INFINITY, // Seconds
       rpcMaxRetries = 5,
       rpcRetryInterval = 1500,
@@ -35,28 +37,36 @@ class GrpcClient {
 
     let { serviceURL } = options;
     if (!protoPath) {
-      throw new InternalServerError('Proto path undefined');
+      throw new InternalServerError('protoPath undefined');
+    }
+    if (!packageDef) {
+      throw new InternalServerError('packageDef undefined.');
     }
 
-    const proto = (!relativeInclude || !relativeInclude.length)
+    const proto = (!includeDirs || !includeDirs.length)
       ? grpcLoader.loadProto(protoPath)
-      : grpcLoader.loadProto(protoPath, relativeInclude);
+      : grpcLoader.loadProto(protoPath, includeDirs);
     if (!proto) {
       throw new InternalServerError(`Error loading ${protoPath}`);
     }
 
-    const pkg = Object.keys(proto)[0];
-    if (!pkg) {
-      throw new InternalServerError(`No package defined in ${protoPath}`);
-    }
+    let depth = proto;
+    const packageArr = packageDef.split('.');
+    // Separates grpc.loadPackageDefinition nested structure
+    packageArr.forEach((p) => {
+      if (depth[p]) {
+        depth = depth[p];
+      }
+    });
 
-    const service = Object.keys(proto[pkg])[0];
-    if (!service) {
-      throw new InternalServerError(`No service defined in ${protoPath}`);
+    const service = Object.keys(depth)[0];
+    if (!service || !depth[service] || !depth[service].service) {
+      throw new InternalServerError(`No service defined in ${protoPath}. Hint: Check your package Definition`);
     }
-    serviceURL = serviceURL || `${service.toLowerCase()}:50051`;
+    // Fall back to naming convention of service definition
+    serviceURL = serviceURL || `${packageArr.join('-')}-${service.toLowerCase()}:50051`;
 
-    const rpcDefs = proto[pkg][service].service;
+    const rpcDefs = depth[service].service;
     if (Object.keys(rpcDefs) === 0) {
       throw new InternalServerError(`rpc definitions is not defined for ${protoPath}`);
     }
@@ -71,20 +81,18 @@ class GrpcClient {
     this.rpcMaxRetries = rpcMaxRetries;
     this.rpcRetryInterval = rpcRetryInterval;
     this.rpcDeadline = rpcDeadline;
-    this.client = GrpcClient._loadClient(proto, pkg, service, serviceURL);
+    this.client = GrpcClient._loadClient(depth, service, serviceURL);
 
     this._genFnDef();
     this._setupConnectionMiddleware();
-
     this._waitForReady();
-    this.counter = 0;
   }
 
-  static _loadClient(proto, _package, service, serviceURL) {
-    if (!proto || !proto[_package] || !proto[_package][service]) {
+  static _loadClient(proto, service, serviceURL) {
+    if (!proto || !proto[service]) {
       throw new InternalServerError(`Error loading ${service} from proto`);
     }
-    const client = new proto[_package][service](
+    const client = new proto[service](
       serviceURL,
       grpc.credentials.createInsecure()
     );
@@ -206,7 +214,14 @@ class GrpcClient {
    * @returns {Promise} resolves callback
    */
   async testConnection(cb) {
+    if (!cb || typeof cb !== 'function') {
+      return null;
+    }
     try {
+      if (!this.ready) {
+        const err = new Error('Connection is not ready');
+        throw err;
+      }
       const res = await cb();
       return res;
     }
@@ -248,7 +263,7 @@ class GrpcClient {
   }
 
   _waitForReady() {
-    this.client.waitForReady(this.deadline, (err) => {
+    this.client.waitForReady(Date.now() + this.deadline, (err) => {
       if (err) {
         throw new InternalServerError(err);
       }

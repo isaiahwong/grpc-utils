@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package api.accounts.v1;
+
+option go_package = "accounts";
+
+// Preferences
+message Preferences {
+  message EmailNotifications {
+    bool unsubscribe_from_all = 1;
+  }
+
+  message PushNotifications {
+    bool unsubscribe_from_all = 1; 
+  }
+
+  string language = 1;
+  EmailNotifications email_notifications = 2;
+  PushNotifications push_notifications = 3;
+}
+
+message ProfileName {
+  string family_name = 1;
+  string given_name = 2;
+  string middle_name = 3;
+}
+
+message ProfileEmails {
+  string value = 1;
+  string type = 2;
+}
+
+message ProfilePhotos {
+  string value = 1;
+}
+
+message UserProfileFacebook {
+  string provider = 1;
+  string id = 2;
+  string display_name = 3;
+  ProfileName name = 4;
+  repeated ProfileEmails emails = 5;
+  repeated ProfilePhotos photos = 6;
+}
+
+message UserProfileGoogle {
+  string provider = 1;
+  string id = 2;
+  string display_name = 3;
+  ProfileName name = 4;
+  repeated ProfileEmails emails = 5;
+  repeated ProfilePhotos photos = 6;
+} 
+
+message Auth {
+  UserProfileFacebook facebook = 1;
+  UserProfileGoogle google = 2;
+  string email = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string name = 6;
+  string picture = 7;
+  string password = 8;
+  string password_hash_method = 9;
+  string password_reset_id = 10;
+  string password_reset_token = 11;
+  int64 password_reset_expires = 12;  
+  int64 password_modified = 13;
+
+  bool verified = 14;
+  int64 verified_date = 15;
+  string verification_token = 16;
+  int64 verification_token_expires = 17;
+
+  int64 captcha_challenge_ts = 18;
+}
+
+message Session {
+  string ip = 1;
+  int64 timestamp = 2;
+  string location = 3;
+  int32 lat = 4;
+  int32 long = 5;
+}
+
+message User {
+  string id = 1;
+  string object = 2;
+  Auth auth = 3;
+  Preferences preferences = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+  int64 logged_in = 7;
+  repeated Session sessions = 8;
+}

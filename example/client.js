@@ -1,20 +1,32 @@
 import logger from 'esther';
-import path from 'path';
 import GrpcClient from '../src/lib/GrpcClient';
 
+const PROTO = `${__dirname}/../proto/api`;
+const INCLUDES = [
+  PROTO,
+  `${__dirname}/../proto/third_party/googleapis`,
+];
 class Service extends GrpcClient {
   constructor() {
     super(
-      path.join(__dirname, 'mail.proto'),
-      { serviceURL: '127.0.0.1:50051' }
+      `${PROTO}/accounts/v1/accounts.proto`,
+      'api.accounts.v1',
+      {
+        serviceURL: '127.0.0.1:50051',
+        includeDirs: INCLUDES,
+        deadline: 2000
+      }
     );
   }
 }
 
+
 const service = new Service();
 
 function test() {
-  service.testConnection().catch(err => logger.error(err));
+  service.testConnection(() => {
+    console.log('done');
+  }).catch(err => logger.error(err));
 }
 
 // Try rpc method
