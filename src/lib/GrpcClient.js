@@ -265,7 +265,8 @@ class GrpcClient {
     return new Promise((accept, reject) => {
       this.client.waitForReady(Date.now() + this.deadline, (err) => {
         if (err) {
-          reject(new InternalServerError(err));
+          reject(err);
+          return;
         }
         logger.info(`Connected to ${this.service}`);
         this.ready = true;

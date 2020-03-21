@@ -19,6 +19,7 @@ export class GrpcClient {
 
     testConnection(cb: any): any;
 
+    connect(): Promise;
 }
 
 export function decodeArrayMetadata(...args: any[]): any;
