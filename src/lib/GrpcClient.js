@@ -85,7 +85,6 @@ class GrpcClient {
 
     this._genFnDef();
     this._setupConnectionMiddleware();
-    this._waitForReady();
   }
 
   static _loadClient(proto, service, serviceURL) {
@@ -262,13 +261,16 @@ class GrpcClient {
     }
   }
 
-  _waitForReady() {
-    this.client.waitForReady(Date.now() + this.deadline, (err) => {
-      if (err) {
-        throw new InternalServerError(err);
-      }
-      logger.info(`Connected to ${this.service}`);
-      this.ready = true;
+  connect() {
+    return new Promise((accept, reject) => {
+      this.client.waitForReady(Date.now() + this.deadline, (err) => {
+        if (err) {
+          reject(new InternalServerError(err));
+        }
+        logger.info(`Connected to ${this.service}`);
+        this.ready = true;
+        accept();
+      });
     });
   }
 

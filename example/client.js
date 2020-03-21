@@ -1,4 +1,5 @@
 import logger from 'esther';
+import grpc from 'grpc';
 import GrpcClient from '../src/lib/GrpcClient';
 
 const PROTO = `${__dirname}/../proto/api`;
@@ -23,10 +24,15 @@ class Service extends GrpcClient {
 
 const service = new Service();
 
-function test() {
+async function test() {
+  await service.connect();
   service.testConnection(() => {
     console.log('done');
   }).catch(err => logger.error(err));
+
+  const metadata = new grpc.Metadata();
+  metadata.set('test', 'hi');
+  service.signUp({}, metadata).catch(err => console.log(err));
 }
 
 // Try rpc method
