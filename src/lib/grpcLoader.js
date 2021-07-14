@@ -1,5 +1,5 @@
 import fs from 'fs';
-import grpc from 'grpc';
+import grpc from '@grpc/grpc-js';
 import { InternalServerError } from 'horeb';
 
 import * as protoLoader from './protoLoader';
