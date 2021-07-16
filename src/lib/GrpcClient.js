@@ -1,4 +1,4 @@
-import grpc from '@grpc/grpc-js';
+import * as grpc from '@grpc/grpc-js';
 import logger from 'esther';
 import { InternalServerError, ServiceUnavailable } from 'horeb';
 
